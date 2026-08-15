@@ -1,0 +1,11 @@
+{
+  "Groceries & Supermarkets": ["Walmart", "Target", "Kroger", "Whole Foods", "Trader Joe's", "Safeway", "Publix", "Aldi", "HEB", "Costco", "Sam's Club", "Instacart", "Food Lion", "Giant Eagle", "Stop and Shop", "Sprouts", "Wegmans"],
+  "Coffee, Dining & Food Delivery": ["Starbucks", "Dunkin", "McDonald's", "DoorDash", "Uber Eats", "Grubhub", "Chipotle", "Subway", "Chick-fil-A", "Panera", "Wendy's", "Domino's", "Taco Bell", "Sweetgreen", "Shake Shack", "Dutch Bros", "Peet's Coffee"],
+  "Transportation & Gas": ["Uber", "Lyft", "Chevron", "Shell", "BP", "ExxonMobil", "7-Eleven", "Circle K", "Speedway", "Texaco", "Marathon Petroleum", "MTA", "Clipper", "Amtrak", "Bird App", "Lime App"],
+  "Subscriptions & Streaming": ["Netflix", "Spotify", "Hulu", "Apple.com/bill", "Disney+", "Amazon Prime", "YouTube Premium", "Max", "HBO Max", "PlayStation", "Xbox", "Nintendo", "Patreon", "NYTimes"],
+  "Retail & E-Commerce": ["Amazon", "AMZN", "eBay", "Etsy", "Best Buy", "Apple Store", "Home Depot", "Lowe's", "IKEA", "Nike", "Zara", "Marshalls", "TJ Maxx", "Nordstrom", "Ross Stores", "Sephora", "Ulta Beauty"],
+  "Utilities & Telecom": ["AT&T", "Verizon", "T-Mobile", "Xfinity", "Comcast", "Spectrum", "Duke Energy", "PG&E", "Con Edison", "Waste Management"],
+  "Travel & Lodging": ["Airbnb", "Vrbo", "Delta Air", "United Airlines", "American Airlines", "Southwest", "Expedia", "Booking.com", "Marriott", "Hilton", "Hertz", "Enterprise"],
+  "Pharmacy & Health": ["CVS Pharmacy", "Walgreens", "Rite Aid", "Planet Fitness", "Equinox", "Quest Diagnostics", "GoodRx"],
+  "P2P & Financial Services": ["Venmo", "Zelle", "Cash App", "PayPal", "Coinbase", "Robinhood", "Fidelity", "Vanguard", "Charles Schwab"]
+}

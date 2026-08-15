@@ -1,23 +1,16 @@
-import datetime
+from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
-"""Requirment: 
-    - Class transation with each having a unique id 
-    - instances of transaction will have unique: int id,  string description, datetime date, decimal amount, string category
-"""
 
-
+@dataclass
 class Transaction:
+    """A normalized financial transaction."""
 
-    def __init__(self, transaction_id, description, transaction_date, amount, category):
-        self.transaction_id = transaction_id
-        self.description = description
-        self.transaction_date = transaction_date
-        self.amount = amount
-        self.category = category 
-
-
-
-
-    
-    
+    transaction_id: int
+    description: str
+    transaction_date: date
+    amount: Decimal
+    category: str = "Unclassified"
+    merchant: str | None = None
+    confidence: float = 0.0

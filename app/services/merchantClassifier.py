@@ -1,97 +1,103 @@
-from rapidfuzz import process, fuzz
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, Mapping, Sequence
+
+from rapidfuzz import fuzz, process
+
 from app.models.transaction import Transaction
 
-'''This file will be responsible for categorizing each transaction'''
 
-merchants = {
-    "Groceries & Supermarkets": [
-        "walmart", "target", "kroger", "whole foods", "trader joe", "safeway",
-        "publix", "aldi", "heb", "heb grocery", "costco", "sam's club", "sams club",
-        "instacart", "food lion", "giant eagle", "stop and shop", "sprouts", "wegmans"
-    ],
-    
-    "Coffee, Dining & Food Delivery": [
-        "starbucks", "dunkin", "dunkin donuts", "mcdonalds", "mcdonald's",
-        "doordash", "uber eats", "grubhub", "chipotle", "subway", "chick-fil-a",
-        "chick fil a", "panera", "wendys", "dominos", "taco bell", "sweetgreen",
-        "shake shack", "dutch bros", "peet's coffee"
-    ],
-    
-    "Transportation & Gas": [
-        "uber", "lyft", "chevron", "shell", "bp", "exxon", "exxonmobil",
-        "7-eleven", "7 eleven", "circle k", "speedway", "texaco", "marathon petroleum",
-        "mta", "clipper", "amtrak", "bird app", "lime app"
-    ],
-    
-    "Subscriptions & Streaming": [
-        "netflix", "spotify", "hulu", "apple.com/bill", "apple com bill",
-        "disney+", "disney plus", "amazon prime", "youtube premium", "max",
-        "hbo max", "playstation", "xbox", "nintendo", "patreon", "nytimes"
-    ],
-    
-    "Retail & E-Commerce": [
-        "amazon", "amzn", "ebay", "etsy", "best buy", "apple store",
-        "home depot", "lowes", "lowe's", "ikea", "nike", "zara", "marshalls",
-        "tj maxx", "nordstrom", "ross stores", "sephora", "ultabeauty"
-    ],
-    
-    "Utilities & Telecom": [
-        "at&t", "att", "verizon", "t-mobile", "tmobile", "xfinity", "comcast",
-        "spectrum", "charter spectrum", "duke energy", "pg&e", "pge",
-        "con edison", "waste management"
-    ],
-    
-    "Travel & Lodging": [
-        "airbnb", "vrbo", "delta", "delta air", "united airlines", "american airlines",
-        "southwest", "expedia", "booking.com", "marriott", "hilton", "hertz", "enterprise"
-    ],
-    
-    "Pharmacy & Health": [
-        "cvs", "cvs pharmacy", "walgreens", "rite aid", "planet fitness",
-        "equinox", "quest diagnostics", "goodrx"
-    ],
-    
-    "P2P & Financial Services": [
-        "venmo", "zelle", "cash app", "paypal", "coinbase", "robinhood",
-        "fidelity", "vanguard", "charles schwab"
+DEFAULT_THRESHOLD = 90.0
+MAX_THRESHOLD = DEFAULT_THRESHOLD  # Backwards-compatible name.
+MERCHANT_DATA_PATH = Path(__file__).parents[1] / "data" / "merchants.json"
+
+
+@dataclass(frozen=True)
+class MerchantMatch:
+    merchant: str | None
+    category: str
+    confidence: float
+
+
+def normalize_description(description: str) -> str:
+    """Lowercase text and collapse punctuation/whitespace for matching."""
+    normalized = re.sub(r"[^a-z0-9&+]+", " ", description.lower())
+    return " ".join(normalized.split())
+
+
+def load_merchants(path: str | Path = MERCHANT_DATA_PATH) -> dict[str, list[str]]:
+    with open(path, encoding="utf-8") as file:
+        data = json.load(file)
+    if not isinstance(data, dict) or not all(isinstance(value, list) for value in data.values()):
+        raise ValueError("Merchant data must map category names to merchant lists.")
+    return data
+
+
+def flatten_merchants(
+    merchant_categories: Mapping[str, Sequence[str]],
+) -> dict[str, tuple[str, str]]:
+    flattened = {}
+    for category, merchant_names in merchant_categories.items():
+        for merchant in merchant_names:
+            flattened[normalize_description(merchant)] = (merchant, category)
+    return flattened
+
+
+MERCHANTS = load_merchants()
+merchants = MERCHANTS  # Backwards-compatible name.
+FLATTENED_MERCHANTS = flatten_merchants(MERCHANTS)
+
+
+def classify_merchant(
+    flattened_merchants: Mapping[str, tuple[str, str] | str],
+    transaction: Transaction,
+) -> tuple[str, float, int] | None:
+    """Return RapidFuzz's match tuple for compatibility with the prototype API."""
+    description = normalize_description(transaction.description)
+    if not flattened_merchants:
+        return None
+    return process.extractOne(description, flattened_merchants.keys(), scorer=fuzz.WRatio)
+
+
+def match_merchant(
+    description: str,
+    flattened_merchants: Mapping[str, tuple[str, str]] = FLATTENED_MERCHANTS,
+    threshold: float = DEFAULT_THRESHOLD,
+) -> MerchantMatch:
+    normalized = normalize_description(description)
+
+    # Prefer the longest literal merchant contained in a bank description.
+    padded_description = f" {normalized} "
+    exact_candidates = [
+        name for name in flattened_merchants if f" {name} " in padded_description
     ]
-}
+    if exact_candidates:
+        key = max(exact_candidates, key=len)
+        merchant, category = flattened_merchants[key]
+        return MerchantMatch(merchant, category, 100.0)
 
-MAX_THRESHOLD = 85
+    fuzzy_match = process.extractOne(normalized, flattened_merchants.keys(), scorer=fuzz.WRatio)
+    if fuzzy_match is None or fuzzy_match[1] < threshold:
+        return MerchantMatch(None, "Unclassified", float(fuzzy_match[1]) if fuzzy_match else 0.0)
 
-FLATTENED_MERCHANTS = {}
-for category, merchant_names in merchants.items():
-    for merchant in merchant_names:
-        FLATTENED_MERCHANTS[merchant] = category
-
-
-def normalize_description(pre_normalized_description):
-    stripped_description = pre_normalized_description.lower().strip()
-    words = stripped_description.split()
-    normalize = " ".join(words)
-    return normalize
+    key, score, _ = fuzzy_match
+    merchant, category = flattened_merchants[key]
+    return MerchantMatch(merchant, category, float(score))
 
 
-def classify_merchant(flattened_merchants, transaction):
-    described = normalize_description(transaction.description)
-    return process.extractOne(described, flattened_merchants.keys(), fuzz.WRatio)
-   
-def classify_transaction(transaction):
-    match_matrix = classify_merchant(FLATTENED_MERCHANTS, transaction)
-    score = match_matrix[1]
-    matched_category = FLATTENED_MERCHANTS[match_matrix[0]]
-    if score < 85:
-        transaction.category = "unclassified"
-    else:
-        transaction.category = matched_category
+def classify_transaction(
+    transaction: Transaction, threshold: float = DEFAULT_THRESHOLD
+) -> Transaction:
+    match = match_merchant(transaction.description, threshold=threshold)
+    transaction.merchant = match.merchant
+    transaction.category = match.category
+    transaction.confidence = round(match.confidence, 1)
     return transaction
-    
 
 
-
-
-     
-
-
-
-
+def categorize_transactions(
+    transactions: Iterable[Transaction], threshold: float = DEFAULT_THRESHOLD
+) -> list[Transaction]:
+    return [classify_transaction(transaction, threshold) for transaction in transactions]

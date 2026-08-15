@@ -1,16 +1,14 @@
 import pytest
-import pytest
-from decimal import Decimal
-from datetime import date
+from pathlib import Path
+
 from app.models.transaction import Transaction
-from app.services.csv_reader import *
+from app.services.csv_reader import import_transactions
 
 
 def test_csvreader():
-    filepath = "/Users/nicksit/DataAnalytics/business-transaction-platform/tests/data/chase_transactions_custom_headers.csv"
+    filepath = Path(__file__).parent / "data_test" / "chase_transactions_custom_headers.csv"
     transactions = import_transactions(filepath) 
     assert isinstance(transactions, list)
     assert all(isinstance(t, Transaction) for t in transactions)
-
 
 
