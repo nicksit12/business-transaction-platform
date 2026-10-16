@@ -2,6 +2,9 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+import csv
+from typing import TextIO
+
 from typing import Iterable, Mapping, Sequence
 
 from rapidfuzz import fuzz, process
@@ -9,8 +12,9 @@ from rapidfuzz import fuzz, process
 from app.models.transaction import Transaction
 
 
+
 DEFAULT_THRESHOLD = 90.0
-MAX_THRESHOLD = DEFAULT_THRESHOLD  # Backwards-compatible name.
+MAX_THRESHOLD = DEFAULT_THRESHOLD  
 MERCHANT_DATA_PATH = Path(__file__).parents[1] / "data" / "merchants.json"
 
 
@@ -34,6 +38,76 @@ def load_merchants(path: str | Path = MERCHANT_DATA_PATH) -> dict[str, list[str]
         raise ValueError("Merchant data must map category names to merchant lists.")
     return data
 
+def save_merchants(merchants: dict[str, list[str]], path: str | Path = MERCHANT_DATA_PATH, ) -> None:
+    with open(path, encoding="utf-8", newline="", mode="w") as file:
+        json.dump(merchants, file, indent=2, ensure_ascii=False)
+
+def add_to_merchants(file: TextIO) -> None:
+    file.seek(0)
+    print("beginning")
+
+    merchants = load_merchants()
+    reader = csv.DictReader(file)
+    transactions = []
+    for record in reader:
+        transaction_record = Transaction(
+        transaction_id=record["transaction_id"],
+        transaction_date=record["transaction_date"],
+        description=record["description"],
+        amount=record["amount"],
+        merchant=record["merchant"],
+        category=record["category"],
+        confidence=record["confidence"],
+            )
+        transactions.append(transaction_record)
+        
+    for transaction in transactions:
+        print(
+            "Checking transaction:",
+            transaction.transaction_id,
+        )
+        print("Merchant:", repr(transaction.merchant))
+        print("Category:", repr(transaction.category))
+
+        if not transaction.merchant:
+            print("Skipped: merchant is empty")
+            continue
+
+        if not transaction.category:
+            print("Skipped: category is empty")
+            continue
+
+        if transaction.category not in merchants:
+            print(
+                "Creating category:",
+                repr(transaction.category),
+            )
+
+            merchants[transaction.category] = []
+        else:
+            print(
+                "Category already exists:",
+                repr(transaction.category),
+            )
+
+        if transaction.merchant not in merchants[transaction.category]:
+            print(
+                "Adding merchant:",
+                repr(transaction.merchant),
+            )
+
+            merchants[transaction.category].append(
+                transaction.merchant
+            )
+        else:
+            print(
+                "Merchant already exists:",
+                repr(transaction.merchant),
+            )
+    save_merchants(merchants, MERCHANT_DATA_PATH)
+
+
+        
 
 def flatten_merchants(
     merchant_categories: Mapping[str, Sequence[str]],
@@ -68,7 +142,6 @@ def match_merchant(
 ) -> MerchantMatch:
     normalized = normalize_description(description)
 
-    # Prefer the longest literal merchant contained in a bank description.
     padded_description = f" {normalized} "
     exact_candidates = [
         name for name in flattened_merchants if f" {name} " in padded_description
@@ -101,3 +174,8 @@ def categorize_transactions(
     transactions: Iterable[Transaction], threshold: float = DEFAULT_THRESHOLD
 ) -> list[Transaction]:
     return [classify_transaction(transaction, threshold) for transaction in transactions]
+
+
+
+    
+

@@ -2,11 +2,12 @@ from collections import defaultdict
 from decimal import Decimal
 from io import StringIO
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Response
 
 from app.models.transaction import Transaction
 from app.services.csv_reader import CSVImportError, read_csv, transactions_from_records
-from app.services.merchantClassifier import categorize_transactions
+from app.services.merchantClassifier import *
+from app.services.csv_writer import *
 
 
 app = FastAPI(
@@ -62,8 +63,24 @@ async def import_transaction_csv(file: UploadFile = File(...)):
         categorized = categorize_transactions(transactions)
     except (UnicodeDecodeError, CSVImportError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    unclassified = []
+    for transaction in categorized:
+        if transaction.category == "Unclassified":
+            unclassified.append(transaction)
+    
+    output = StringIO()
 
-    return {
-        "summary": _summarize(categorized),
-        "transactions": [_serialize(transaction) for transaction in categorized],
-    }
+    export_transactions(unclassified, output=output)
+
+    csv_text = output.getvalue()
+
+    return Response(content=csv_text, media_type="text/csv", headers={
+            "Content-Disposition":
+            'attachment; filename="unclassified.csv"'
+        },)
+
+@app.post("/transactions/import/classification")
+async def classify_all_transactions(file: UploadFile = File(...)):
+    content = (await file.read()).decode("utf-8-sig")
+    csv_stream = StringIO(content)
+    add_to_merchants(csv_stream)
