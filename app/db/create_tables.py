@@ -1,7 +1,7 @@
 from base import Base
 from session import engine
 
-import models
+import app.db.models
 
 def create_tables() -> None:
     Base.metadata.create_all(bind=engine)

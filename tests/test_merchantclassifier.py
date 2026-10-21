@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 from app.services.merchantClassifier import (
     categorize_transactions,
     classify_transaction,

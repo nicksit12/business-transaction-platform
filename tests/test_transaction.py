@@ -1,7 +1,7 @@
 import pytest
 from decimal import Decimal
 from datetime import date
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 
 def test_transaction_model():
     data = {"transaction_id": 1, "description": "HOME_DEPOT", "transaction_date":  date(2026, 3, 3), "amount": Decimal("100.20"), "category": "material"}

@@ -19,7 +19,7 @@ from sqlalchemy import(
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from base import Base 
+from app.db.base import Base 
 
 class Transaction(Base):
     __tablename__ = "transactions"

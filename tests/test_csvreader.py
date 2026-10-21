@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 from app.services.csv_reader import import_transactions
 
 
