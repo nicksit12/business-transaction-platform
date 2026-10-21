@@ -4,7 +4,7 @@ from io import StringIO
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Response
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 from app.services.csv_reader import CSVImportError, read_csv, transactions_from_records
 from app.services.merchantClassifier import *
 from app.services.csv_writer import *
@@ -84,3 +84,5 @@ async def classify_all_transactions(file: UploadFile = File(...)):
     content = (await file.read()).decode("utf-8-sig")
     csv_stream = StringIO(content)
     add_to_merchants(csv_stream)
+
+

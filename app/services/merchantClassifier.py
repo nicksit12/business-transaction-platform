@@ -9,7 +9,7 @@ from typing import Iterable, Mapping, Sequence
 
 from rapidfuzz import fuzz, process
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 
 
 

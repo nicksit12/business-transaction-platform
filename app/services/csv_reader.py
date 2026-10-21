@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import IO, Iterable
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 
 
 

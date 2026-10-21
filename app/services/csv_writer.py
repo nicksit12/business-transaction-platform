@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Iterable
 from typing import TextIO
 
-from app.models.transaction import Transaction
+from app.schemas.transaction import Transaction
 
 
 EXPORT_HEADERS = [
