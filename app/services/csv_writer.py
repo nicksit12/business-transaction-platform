@@ -1,37 +1,49 @@
 import csv
-from pathlib import Path
-from typing import Iterable
 from typing import TextIO
 
-from app.schemas.transaction import Transaction
+from app.db.models import Transaction
 
 
-EXPORT_HEADERS = [
-    "transaction_id",
-    "transaction_date",
-    "description",
-    "amount",
-    "merchant",
-    "category",
-    "confidence",
-]
+class CSVWriter:
+    headers = [
+        "transaction_id",
+        "transaction_date",
+        "description",
+        "normalized_description",
+        "amount",
+        "merchant",
+        "category",
+        "classification_status",
+        "confidence",
+    ]
 
+    def write(self, transactions: list[Transaction], output: TextIO) -> TextIO:
+        writer = csv.DictWriter(output, fieldnames=self.headers)
+        writer.writeheader()
 
-def export_transactions(
-    transactions: Iterable[Transaction], output: TextIO
-) -> TextIO:
-    writer = csv.DictWriter(output, fieldnames=EXPORT_HEADERS)
-    writer.writeheader()
-    for transaction in transactions:
-        writer.writerow(
-            {
-                "transaction_id": transaction.transaction_id,
-                "transaction_date": transaction.transaction_date.isoformat(),
-                "description": transaction.description,
-                "amount": str(transaction.amount),
-                "merchant": transaction.merchant or "",
-                "category": transaction.category,
-                "confidence": f"{transaction.confidence:.1f}",
-            }
-        )
-    return output
+        for transaction in transactions:
+            writer.writerow(
+                {
+                    "transaction_id": transaction.id,
+                    "transaction_date": transaction.transaction_date.isoformat(),
+                    "description": transaction.description,
+                    "normalized_description": transaction.normalized_description,
+                    "amount": str(transaction.amount),
+                    "merchant": (
+                        transaction.merchant.canonical_name
+                        if transaction.merchant
+                        else ""
+                    ),
+                    "category": (
+                        transaction.category.name if transaction.category else ""
+                    ),
+                    "classification_status": transaction.classification_status,
+                    "confidence": (
+                        transaction.classification_confidence
+                        if transaction.classification_confidence is not None
+                        else ""
+                    ),
+                }
+            )
+
+        return output

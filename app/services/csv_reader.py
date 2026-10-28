@@ -2,138 +2,96 @@ import csv
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import IO, Iterable
+from typing import TextIO
 
-from app.schemas.transaction import Transaction
+from app.db.models import Statement, Transaction
 
 
-
-STANDARD_HEADERS = {
-    "transaction_id",
-    "description",
-    "transaction_date",
-    "amount",
-    "category",
-}
+STANDARD_HEADERS = {"description", "transaction_date", "amount"}
 CHASE_HEADERS = {"Posting Date", "Description", "Amount"}
 
 
-
-
 class CSVImportError(ValueError):
-    """Raised when an input CSV cannot be converted into transactions."""
+    pass
 
 
-def read_csv_standard(filepath: str | Path) -> list[dict[str, str]]:
-    with open(filepath, mode="r", encoding="utf-8-sig", newline="") as file:
-        return read_csv(file)
+class CSVReader:
+    """Read a supported statement CSV and build unsaved database objects."""
 
+    def read(self, file: TextIO, statement: Statement) -> list[Transaction]:
+        reader = csv.DictReader(file)
+        if not reader.fieldnames:
+            raise CSVImportError("The CSV is empty or does not contain headers.")
 
-def read_csv(file: IO[str]) -> list[dict[str, str]]:
-    reader = csv.DictReader(file)
-    if not reader.fieldnames:
-        raise CSVImportError("The CSV is empty or does not contain a header row.")
-    return [dict(row) for row in reader]
-
-
-def _parse_amount(value: str) -> Decimal:
-    if not isinstance(value, str) or not value.strip():
-        raise CSVImportError("Transaction amount is required.")
-    cleaned = value.strip().replace("$", "").replace(",", "")
-    if cleaned.startswith("(") and cleaned.endswith(")"):
-        cleaned = f"-{cleaned[1:-1]}"
-    try:
-        return Decimal(cleaned)
-    except InvalidOperation as exc:
-        raise CSVImportError(f"Invalid transaction amount: {value!r}") from exc
-
-
-def _parse_date(value: str):
-    if not isinstance(value, str) or not value.strip():
-        raise CSVImportError("Transaction date is required.")
-    for date_format in ("%Y-%m-%d", "%m/%d/%Y"):
-        try:
-            return datetime.strptime(value.strip(), date_format).date()
-        except ValueError:
-            continue
-    raise CSVImportError(
-        f"Invalid transaction date: {value!r}. Use YYYY-MM-DD or MM/DD/YYYY."
-    )
-
-
-def convert_to_datatypes(records: list[dict[str, str]]) -> list[dict]:
-    """Convert records in the app's standard CSV format to typed values."""
-    converted = []
-    for row_number, record in enumerate(records, start=2):
-        try:
-            raw_id = record["transaction_id"]
-            digits = "".join(character for character in raw_id if character.isdigit())
-            if not digits:
-                raise CSVImportError(f"Invalid transaction ID: {raw_id!r}")
-            description = record["description"]
-            if not isinstance(description, str) or not description.strip():
-                raise CSVImportError("Transaction description is required.")
-            converted.append(
-                {
-                    "transaction_id": int(digits),
-                    "description": description.strip(),
-                    "transaction_date": _parse_date(record["transaction_date"]),
-                    "amount": _parse_amount(record["amount"]),
-                    "category": record.get("category", "") or "Unclassified",
-                }
+        headers = set(reader.fieldnames)
+        if STANDARD_HEADERS.issubset(headers):
+            date_header = "transaction_date"
+            description_header = "description"
+            amount_header = "amount"
+        elif CHASE_HEADERS.issubset(headers):
+            date_header = "Posting Date"
+            description_header = "Description"
+            amount_header = "Amount"
+        else:
+            raise CSVImportError(
+                "Unsupported CSV headers. Include description, transaction_date, "
+                "and amount, or use a Chase activity export."
             )
-        except (KeyError, TypeError) as exc:
-            raise CSVImportError(f"Invalid data on CSV row {row_number}: {exc}") from exc
-    return converted
 
+        transactions = []
+        for row_number, row in enumerate(reader, start=1):
+            description = (row.get(description_header) or "").strip()
+            if not description:
+                raise CSVImportError(
+                    f"Transaction description is required on row {row_number + 1}."
+                )
 
-def _convert_chase_records(records: list[dict[str, str]]) -> list[dict]:
-    converted = []
-    for transaction_id, record in enumerate(records, start=1):
-        description = record["Description"]
-        if not isinstance(description, str) or not description.strip():
-            raise CSVImportError("Transaction description is required.")
-        converted.append(
-            {
-                "transaction_id": transaction_id,
-                "description": description.strip(),
-                "transaction_date": _parse_date(record["Posting Date"]),
-                "amount": _parse_amount(record["Amount"]),
-                "category": "Unclassified",
-            }
-        )
-    return converted
+            transaction = Transaction(
+                statement=statement,
+                source_row_number=row_number,
+                transaction_date=self._parse_date(row.get(date_header), row_number),
+                description=description,
+                normalized_description="",
+                amount=self._parse_amount(row.get(amount_header), row_number),
+                classification_status="unclassified",
+            )
+            transactions.append(transaction)
 
+        return transactions
 
-def convert_to_transactions(records: Iterable[dict]) -> list[Transaction]:
-    return [Transaction(**record) for record in records]
+    def read_path(self, path: str | Path, statement: Statement) -> list[Transaction]:
+        with open(path, encoding="utf-8-sig", newline="") as file:
+            return self.read(file, statement)
 
+    def _parse_date(self, value: str | None, row_number: int):
+        if not value:
+            raise CSVImportError(
+                f"Transaction date is required on row {row_number + 1}."
+            )
 
+        for date_format in ("%Y-%m-%d", "%m/%d/%Y"):
+            try:
+                return datetime.strptime(value.strip(), date_format).date()
+            except ValueError:
+                pass
 
-def transactions_from_records(records: list[dict[str, str]]) -> list[Transaction]:
-    if not records:
-        return []
-
-    headers = set(records[0])
-    if STANDARD_HEADERS.issubset(headers):
-        converted = convert_to_datatypes(records)
-    elif CHASE_HEADERS.issubset(headers):
-        converted = _convert_chase_records(records)
-    else:
         raise CSVImportError(
-            "Unsupported CSV headers. Use the standard transaction format or a "
-            "Chase activity export."
+            f"Invalid transaction date {value!r} on row {row_number + 1}."
         )
-    return convert_to_transactions(converted)
 
+    def _parse_amount(self, value: str | None, row_number: int) -> Decimal:
+        if not value:
+            raise CSVImportError(
+                f"Transaction amount is required on row {row_number + 1}."
+            )
 
-def import_transactions(filepath: str | Path) -> list[Transaction]:
-    return transactions_from_records(read_csv_standard(filepath))
+        cleaned = value.strip().replace("$", "").replace(",", "")
+        if cleaned.startswith("(") and cleaned.endswith(")"):
+            cleaned = "-" + cleaned[1:-1]
 
-
-
-
-
-
-
-
+        try:
+            return Decimal(cleaned)
+        except InvalidOperation as error:
+            raise CSVImportError(
+                f"Invalid transaction amount {value!r} on row {row_number + 1}."
+            ) from error
