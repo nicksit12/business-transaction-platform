@@ -1,74 +1,59 @@
 # Business Transaction Platform
 
-Release 1 is a small FastAPI service and Python pipeline that imports transaction
-CSV files, identifies known merchants, assigns spending categories, and preserves
-uncertain transactions for manual review.
-
-## Release 1 features
-
-- Imports the app's standard CSV format and Chase activity exports.
-- Normalizes merchant descriptions and performs exact-then-fuzzy matching.
-- Keeps merchant/category configuration in `app/data/merchants.json`.
-- Marks low-confidence matches as `Unclassified` without dropping them.
-- Categorizes a full CSV and exports enriched results to another CSV.
-- Provides an HTTP upload endpoint with totals and categorized transactions.
+This FastAPI service imports bank statement CSV files, stores statements and
+transactions in SQLite, normalizes transaction descriptions, and classifies
+known merchants. Transactions that cannot be classified can be downloaded,
+edited, and uploaded again as corrections.
 
 ## Setup
-
-Python 3.11 or newer is recommended.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Run the tests:
-
-```bash
 pytest -q
-```
-
-Run the API:
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the interactive API documentation.
+Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
-## CSV formats
+## Statement formats
 
-The standard format is:
+The standard format requires these columns (additional columns are ignored):
 
 ```csv
-transaction_id,description,transaction_date,amount,category
-TXN-1,WHOLE FOODS MARKET,2026-08-06,-64.12,
+description,transaction_date,amount
+WHOLE FOODS MARKET,2026-08-06,-64.12
 ```
 
-Dates may use `YYYY-MM-DD` or `MM/DD/YYYY`. Amounts may be plain decimals,
-currency values, or accounting-style negatives such as `($12.34)`. A Chase CSV
-must include at least `Posting Date`, `Description`, and `Amount`.
+Chase exports containing `Posting Date`, `Description`, and `Amount` are also
+supported. Dates may be `YYYY-MM-DD` or `MM/DD/YYYY`. Amounts may be plain
+decimals, currency values, or accounting negatives such as `($12.34)`.
 
-Upload a file:
+## API workflow
+
+Upload a statement:
 
 ```bash
-curl -F "file=@transactions.csv;type=text/csv" \
-  http://127.0.0.1:8000/transactions/import
+curl -F "file=@statement.csv;type=text/csv" \
+  http://127.0.0.1:8000/statements/upload
 ```
 
-## Use the pipeline from Python
+The response includes the statement ID and links for the next two operations.
+Download only its unclassified transactions:
 
-```python
-from app.services.csv_reader import import_transactions
-from app.services.csv_writer import export_transactions
-from app.services.merchantClassifier import categorize_transactions
-
-transactions = import_transactions("transactions.csv")
-categorized = categorize_transactions(transactions)
-export_transactions(categorized, "categorized.csv")
+```bash
+curl -o unclassified.csv \
+  http://127.0.0.1:8000/statements/1/output
 ```
 
-Exported files contain transaction ID, date, original description, amount,
-canonical merchant, category, and confidence score. Edit
-`app/data/merchants.json` to add or reorganize supported merchants.
+Fill in the `merchant` and `category` columns in that file, then upload it. Rows
+are matched by the database `transaction_id`, and only those rows are updated:
+
+```bash
+curl -F "file=@unclassified.csv;type=text/csv" \
+  http://127.0.0.1:8000/statements/1/reclassify
+```
+
+Manual corrections also create the merchant alias when needed, so later
+statements can classify that merchant automatically.

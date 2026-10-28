@@ -1,36 +1,43 @@
 from datetime import date
 from decimal import Decimal
 
-from app.schemas.transaction import Transaction
-from app.services.merchantClassifier import (
-    categorize_transactions,
-    classify_transaction,
-    normalize_description,
-)
+from app.db.models import Statement, Transaction
+from app.services.merchant_classifier import MerchantClassifier, normalize_description
 
 
-def transaction(description: str) -> Transaction:
-    return Transaction(1, description, date(2026, 8, 1), Decimal("-10.00"))
+def make_transaction(description):
+    statement = Statement(original_filename="test.csv", file_hash=description)
+    return Transaction(
+        statement=statement,
+        source_row_number=1,
+        transaction_date=date(2026, 8, 1),
+        description=description,
+        normalized_description="",
+        amount=Decimal("-10.00"),
+        classification_status="unclassified",
+    )
 
 
 def test_normalizes_description():
     assert normalize_description("  WHOLE   FOODS #123 ") == "whole foods 123"
 
 
-def test_classifies_known_merchant():
-    result = classify_transaction(transaction("WHOLE FOODS MARKET #104"))
-    assert result.merchant == "Whole Foods"
-    assert result.category == "Groceries & Supermarkets"
-    assert result.confidence == 100.0
+def test_classifier_updates_database_transaction(session):
+    transaction = make_transaction("WHOLE FOODS MARKET #104")
+
+    MerchantClassifier(session).classify([transaction])
+
+    assert transaction.normalized_description == "whole foods market 104"
+    assert transaction.merchant.canonical_name == "Whole Foods"
+    assert transaction.category.name == "Groceries"
+    assert transaction.classification_status == "classified"
 
 
-def test_unknown_merchant_is_preserved_for_manual_review():
-    result = classify_transaction(transaction("LOCAL MYSTERY SHOP 991"))
-    assert result.description == "LOCAL MYSTERY SHOP 991"
-    assert result.merchant is None
-    assert result.category == "Unclassified"
+def test_unknown_transaction_stays_unclassified(session):
+    transaction = make_transaction("LOCAL MYSTERY SHOP 991")
 
+    MerchantClassifier(session).classify([transaction])
 
-def test_categorizes_a_batch():
-    results = categorize_transactions([transaction("UBER RIDES"), transaction("STARBUCKS")])
-    assert [item.merchant for item in results] == ["Uber", "Starbucks"]
+    assert transaction.merchant is None
+    assert transaction.category is None
+    assert transaction.classification_status == "unclassified"

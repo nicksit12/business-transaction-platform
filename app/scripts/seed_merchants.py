@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from sqlalchemy import select
-from csv import DictReader
 
 from app.db.models import (
     Category, 
@@ -11,14 +10,13 @@ from app.db.models import (
 )
 
 from app.db.session import SessionLocal
-from app.services.merchantClassifier import load_merchants, normalize_description
+from app.services.merchant_classifier import normalize_description
 
-FILE_MERCHANTS = "app/data/merchants.json"
-
-#create a session 
+FILE_MERCHANTS = Path(__file__).parents[1] / "data" / "merchants.json"
 
 def seed_merchants() -> None:
-    merchant_data = load_merchants()
+    with open(FILE_MERCHANTS, encoding="utf-8") as file:
+        merchant_data = json.load(file)
 
     with SessionLocal.begin() as session:
         for category_name, merchant_names in merchant_data.items():
