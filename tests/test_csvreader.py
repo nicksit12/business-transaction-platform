@@ -14,3 +14,4 @@ def test_csv_reader_creates_database_transactions():
     assert all(isinstance(transaction, Transaction) for transaction in transactions)
     assert transactions[0].statement is statement
     assert transactions[0].source_row_number == 1
+
