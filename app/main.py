@@ -31,6 +31,7 @@ def root():
     return {"message": "Business Transaction Platform", "version": "2.0.0"}
 
 
+
 def read_upload(content: bytes) -> StringIO:
     try:
         return StringIO(content.decode("utf-8-sig"))
@@ -112,6 +113,16 @@ def output_unclassified_statement(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+@app.post("/development/reset")
+def reset_database():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    seed_merchants()
+
+    return {
+        "message" : "Database recreated and reseeded."
+    }
 
 
 @app.post("/statements/{statement_id}/reclassify")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Boolean, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -22,6 +22,13 @@ class Merchant(Base):
     default_category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id"),
         nullable=True,
+    )
+
+    write_off: Mapped[bool | None] = mapped_column(
+        Boolean,
+        default=False,
+        server_default= false(),
+        nullable=True 
     )
 
 

@@ -34,6 +34,11 @@ class CSVWriter:
                         if transaction.merchant
                         else ""
                     ),
+                    "write_off": (
+                        transaction.merchant.write_off
+                        if transaction.merchant
+                        else ""
+                    ),
                     "category": (
                         transaction.category.name if transaction.category else ""
                     ),

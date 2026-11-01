@@ -4,6 +4,8 @@ from app.db.models import (
     Category,
     Merchant,
     MerchantAlias,
+    Transaction,
+    Statement
 )
 from app.db.session import SessionLocal
 
@@ -24,9 +26,15 @@ def check_database() -> None:
             )
         )
 
+        transaction_count = session.scalar(select(func.count()).select_from(Transaction))
+        statement_count = session.scalar(select(func.count()).select_from(Statement))
+
         print("Categories:", category_count)
         print("Merchants:", merchant_count)
         print("Aliases:", alias_count)
+        print("transactions:", transaction_count)
+        print("statements:", statement_count)
+
 
 
 if __name__ == "__main__":
