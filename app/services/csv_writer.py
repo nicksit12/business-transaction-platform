@@ -12,6 +12,7 @@ class CSVWriter:
         "normalized_description",
         "amount",
         "merchant",
+        "write_off",
         "category",
         "classification_status",
         "confidence",

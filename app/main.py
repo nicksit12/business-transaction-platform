@@ -105,6 +105,7 @@ def output_unclassified_statement(
         .order_by(Transaction.source_row_number)
     ).all()
 
+    
     output = StringIO()
     CSVWriter().write(list(transactions), output)
     filename = f"statement-{statement_id}-unclassified.csv"
@@ -113,6 +114,42 @@ def output_unclassified_statement(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+@app.get("/development/current")
+def get_current_categories(
+    session: Session=Depends(get_session)
+):
+    categories = session.scalars(
+        select(Category)
+        .order_by(Category.name)
+        ).all()
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Name",
+        "Type",
+    ])
+
+    for category in categories:
+        writer.writerow([category.name,
+                         category.category_type,])
+
+    filename = "Current-Categories.csv"
+    return Response( 
+        content = output.getvalue(),
+        media_type="text/csv", 
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+
+    )
+
+    
+
+    
+
+
+
 
 @app.post("/development/reset")
 def reset_database():
@@ -233,4 +270,6 @@ def get_or_create_alias(
             normalized_alias=normalized_alias,
         )
         session.add(alias)
+        session.flush()
+
     return alias
