@@ -57,3 +57,15 @@ curl -F "file=@unclassified.csv;type=text/csv" \
 
 Manual corrections also create the merchant alias when needed, so later
 statements can classify that merchant automatically.
+
+Query every transaction associated with a merchant by its name:
+
+```bash
+curl http://127.0.0.1:8000/merchants/Starbucks/transactions
+```
+
+The response includes the merchant, transaction count, and transactions ordered
+by transaction date. Name matching is case-insensitive. A blank or oversized
+name returns `400`; an unknown merchant returns `404`. A known merchant with no
+transactions returns an empty list. URL-encode names containing spaces (for
+example, `Whole%20Foods`).

@@ -3,7 +3,7 @@ import hashlib
 from io import StringIO
 
 from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
@@ -149,6 +149,61 @@ def get_current_categories(
     
 
 
+
+
+@app.get("/merchants/{merchant_name}/transactions")
+def get_merchant_transactions(
+    merchant_name: str,
+    session: Session = Depends(get_session),
+):
+    normalized_name = merchant_name.strip()
+    if not normalized_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Merchant name is required.",
+        )
+
+    if len(normalized_name) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="Merchant name must be 200 characters or fewer.",
+        )
+
+    merchant = session.scalar(
+        select(Merchant).where(
+            func.lower(Merchant.canonical_name) == normalized_name.lower()
+        )
+    )
+    if merchant is None:
+        raise HTTPException(status_code=404, detail="Merchant not found.")
+
+    transactions = session.scalars(
+        select(Transaction)
+        .where(Transaction.merchant_id == merchant.id)
+        .order_by(Transaction.transaction_date, Transaction.id)
+    ).all()
+
+    return {
+        "merchant": {
+            "id": merchant.id,
+            "name": merchant.canonical_name,
+        },
+        "transaction_count": len(transactions),
+        "transactions": [
+            {
+                "id": transaction.id,
+                "statement_id": transaction.statement_id,
+                "source_row_number": transaction.source_row_number,
+                "transaction_date": transaction.transaction_date,
+                "description": transaction.description,
+                "amount": transaction.amount,
+                "category_id": transaction.category_id,
+                "classification_status": transaction.classification_status,
+                "classification_confidence": transaction.classification_confidence,
+            }
+            for transaction in transactions
+        ],
+    }
 
 
 @app.post("/development/reset")
