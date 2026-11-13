@@ -16,8 +16,8 @@ from app.services.csv_writer import CSVWriter
 from app.services.merchant_classifier import MerchantClassifier, normalize_description
 
 
-Base.metadata.create_all(bind=engine)
-seed_merchants()
+#Base.metadata.create_all(bind=engine)
+#seed_merchants()
 
 app = FastAPI(
     title="Business Transaction Platform",
